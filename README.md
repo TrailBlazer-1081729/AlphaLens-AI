@@ -13,3 +13,5 @@ AlphaLens AI transforms financial reports into a semantically enriched knowledge
 - Jina Embeddings
 - ChromaDB
 - Financial document retrieval
+
+-------------in Progress--------------
