@@ -15,7 +15,6 @@ KNOWLEDGE_BASE_PATH = Path(__file__).parent.parent / "knowledge-base"
 wait = wait_exponential(multiplier=1, min=10, max=240)
 
 
-# --- Pydantic Models for Architect LLM Output ---
 class PartBoundary(BaseModel):
     part_number: int = Field(description="The sequential number of this part (e.g., 1, 2, 3...)")
     topic: str = Field(description="A brief description of the distinct topic covered in this part")
@@ -109,9 +108,10 @@ def slice_document(text: str, blueprint: DocumentBlueprint) -> list[dict]:
 
 if __name__ == "__main__":
     documents = fetch_documents()
-    cache_file = Path(__file__).parent / "sliced_parts_cache.json"
+    cache_file = Path(__file__).parent.parent/"stage_1_json"/ "sliced_parts_cache.json"
 
     if cache_file.exists():
+
         print("Loading cached sliced parts...")
         with open(cache_file, "r", encoding="utf-8") as f:
             all_sliced_data = json.load(f)

@@ -12,8 +12,8 @@ load_dotenv(override=True)
 MODEL = "gemini/gemini-3.1-flash-lite"
 
 
-SLICED_CACHE = Path(__file__).parent / "sliced_parts_cache.json"
-FINAL_CHUNKS_CACHE = Path(__file__).parent / "final_rag_chunks.json"
+SLICED_CACHE = Path(__file__).parent.parent/"stage_1_json"/ "sliced_parts_cache.json"
+FINAL_CHUNKS_CACHE = Path(__file__).parent.parent/"stage_2_json"/ "final_rag_chunks.json"
 
 
 
@@ -190,7 +190,7 @@ if __name__ == "__main__":
             all_final_chunks = json.load(f)
     else:
         all_final_chunks = []
-        print("Sending parts to Worker LLM (12 calls total)...")
+        print("Sending parts to Worker LLM ...")
 
 
 
