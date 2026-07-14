@@ -7,7 +7,7 @@ load_dotenv(override=True)
 
 
 ROOT_DIR = Path(__file__).parent.parent
-DB_PATH = str(ROOT_DIR / "preprocessed_db")
+DB_PATH = str(ROOT_DIR / "finance_db")
 
 
 JINA_API_KEY = os.getenv("jina")
