@@ -94,13 +94,18 @@ def build_knowledge_base(company_name: str, year: int):
         # ----------------------------
         # Stage 2
         # ----------------------------
-        all_final_chunks = []
 
-        for section in sections:
-            # FIX: Map the exact dictionary keys from parse_10k_items
+        all_final_chunks = []
+        total_sections = len(sections)
+
+        for i, section in enumerate(sections, start=1):
+            # FIX: Yield progress updates inside the loop so Gradio doesn't look stuck!
+            topic_name = section.get("topic", "Unknown Topic")
+            yield f"🧠 Step 4/5: Generating headlines... (Section {i}/{total_sections}: {topic_name})"
+
             part = {
-                "part_number": section.get("part_number", 0),
-                "topic": section.get("topic", "General Document Content"),
+                "part_number": i,
+                "topic": topic_name,
                 "text": section.get("text", ""),
                 "source": section.get("source", str(md_path)),
                 "type": section.get("type", "finance_reports"),
@@ -110,7 +115,6 @@ def build_knowledge_base(company_name: str, year: int):
             processed_chunks = process_single_part(part)
             all_final_chunks.extend(processed_chunks)
 
-        print(f"\n✅ Stage 2 Complete - Generated {len(all_final_chunks)} Final Chunks\n")
         print(f"\n✅ Stage 2 Complete - Generated {len(all_final_chunks)} Final Chunks\n")
 
         stage_2_cache = Path(__file__).parent / "stage_2_dynamic_cache.json"
@@ -125,12 +129,25 @@ def build_knowledge_base(company_name: str, year: int):
 
 
     yield "☁️ Step 5/5: Embedding and uploading to Qdrant Cloud (this may take a minute)..."
-    try:
-        upload_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=120)
-        create_embeddings_for_file(upload_client, all_final_chunks, collection_name)
-    except Exception as e:
-        yield f"❌ Error uploading to cloud: {e}"
-        return
+
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+
+            upload_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=120)
+            create_embeddings_for_file(upload_client, all_final_chunks, collection_name)
+            break
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                yield f"⚠️ Step 5 connection failed (attempt {attempt + 1}/{max_retries}). Retrying in {wait_time}s... Error: {e}"
+                import time
+                time.sleep(wait_time)
+            else:
+
+                yield f"❌ Error uploading to cloud after {max_retries} attempts: {e}"
+                return
 
 
 if __name__ == "__main__":
