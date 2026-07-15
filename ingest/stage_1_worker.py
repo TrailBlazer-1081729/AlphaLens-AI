@@ -9,7 +9,7 @@ import time
 
 load_dotenv(override=True)
 
-MODEL = "gemini/gemini-3.1-flash-lite"
+MODEL = "gemini/gemini-2.0-flash"
 KNOWLEDGE_BASE_PATH = Path(__file__).parent.parent / "knowledge-base"
 
 wait = wait_exponential(multiplier=1, min=10, max=240)
@@ -62,7 +62,7 @@ def make_architect_prompt(document_text: str) -> str:
     """
 
 
-@retry(wait=wait)
+# @retry(wait=wait)
 def get_blueprint(document: dict) -> DocumentBlueprint:
 
     print(f"Getting blueprint for {document['source']}...")

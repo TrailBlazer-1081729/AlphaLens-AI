@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
-from chromadb import PersistentClient
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
 from openai import OpenAI
 from tqdm import tqdm
 import json
@@ -10,22 +11,17 @@ import os
 load_dotenv(override=True)
 
 
-FINAL_CHUNKS_CACHE = Path(__file__).parent.parent/"stage_2_json"/ "final_rag_chunks.json"
-DB_NAME = str(Path(__file__).parent.parent / "finance_db")
+FINAL_CHUNKS_CACHE = Path(__file__).parent.parent / "stage_2_json" / "final_rag_chunks.json"
 
 
 JINA_API_KEY = os.getenv("jina")
 JINA_MODEL = "jina-embeddings-v4"
-BATCH_SIZE = 100
+JINA_BATCH_SIZE = 100  # How many texts to send to Jina at once (100 is fast and safe)
+QDRANT_UPLOAD_BATCH = 20  # How many vectors to upload to Qdrant at once (prevents timeout)
 
 
 
 def sanitize_collection_name(filename: str) -> str:
-    """
-    ChromaDB requires collection names to be 3-63 characters,
-    alphanumeric with underscores, and starting with a letter/underscore.
-    """
-
     name = Path(filename).stem
     name = re.sub(r'[^a-zA-Z0-9]', '_', name)
     name = re.sub(r'_+', '_', name)
@@ -35,58 +31,54 @@ def sanitize_collection_name(filename: str) -> str:
 
 
 
-
-def create_embeddings_for_file(chroma_client: OpenAI, chunks: list[dict]):
-    """Processes a single file's chunks: checks DB, calls Jina, and inserts into Chroma."""
-
+def create_embeddings_for_file(qdrant_client: QdrantClient, chunks: list[dict]):
     source_file = chunks[0]["metadata"]["source"]
     collection_name = sanitize_collection_name(source_file)
 
-    existing_collections = [c.name for c in chroma_client.list_collections()]
+
+    existing_collections = [c.name for c in qdrant_client.get_collections().collections]
     if collection_name in existing_collections:
-        collection = chroma_client.get_collection(collection_name)
-        if collection.count() > 0:
-            print(
-                f"  -> Collection '{collection_name}' already has {collection.count()} chunks. Skipping to save API costs.")
+        collection = qdrant_client.get_collection(collection_name)
+        if collection.points_count > 0:
+            print(f"  -> Collection '{collection_name}' already has {collection.points_count} chunks. Skipping.")
             return
 
-    print(f"  -> Creating new collection: '{collection_name}' and calling Jina API...")
-    collection = chroma_client.get_or_create_collection(collection_name)
 
+    print(f"  -> Creating new collection: '{collection_name}' and calling Jina API...")
+    qdrant_client.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(size=2048, distance=Distance.COSINE)
+    )
 
 
     texts_to_embed = [f"{chunk.get('headline', '')}\n\n{chunk['original_text']}" for chunk in chunks]
-    ids = [str(i) for i in range(len(chunks))]
+    jina_client = OpenAI(api_key=JINA_API_KEY, base_url="https://api.jina.ai/v1")
+    vectors = []
+
+    for i in tqdm(range(0, len(texts_to_embed), JINA_BATCH_SIZE), desc=f"Embedding {collection_name}"):
+        batch = texts_to_embed[i:i + JINA_BATCH_SIZE]
+        response = jina_client.embeddings.create(model=JINA_MODEL, input=batch)
+        vectors.extend([x.embedding for x in response.data])
 
 
-
-    metas = []
-    for chunk in chunks:
-        metas.append({
+    points = []
+    for idx, chunk in enumerate(chunks):
+        payload = {
+            "text": chunk["original_text"],
             "headline": chunk.get("headline", ""),
             "summary": chunk.get("summary", ""),
             "source": chunk["metadata"]["source"],
             "type": chunk["metadata"]["type"],
             "broad_topic": chunk["metadata"].get("broad_topic", "")
-        })
+        }
+        points.append(PointStruct(id=idx, vector=vectors[idx], payload=payload))
 
 
-    jina_client = OpenAI(api_key=JINA_API_KEY, base_url="https://api.jina.ai/v1")
-    vectors = []
+    for i in range(0, len(points), QDRANT_UPLOAD_BATCH):
+        batch = points[i:i + QDRANT_UPLOAD_BATCH]
+        qdrant_client.upsert(collection_name=collection_name, points=batch)
 
-    for i in tqdm(range(0, len(texts_to_embed), BATCH_SIZE), desc=f"Embedding {collection_name}"):
-        batch = texts_to_embed[i:i + BATCH_SIZE]
-        response = jina_client.embeddings.create(model=JINA_MODEL, input=batch)
-        vectors.extend([x.embedding for x in response.data])
-
-
-    collection.add(
-        ids=ids,
-        embeddings=vectors,
-        documents=texts_to_embed,
-        metadatas=metas
-    )
-    print(f"  -> Successfully inserted {len(chunks)} chunks into '{collection_name}'.")
+    print(f"  -> Successfully uploaded {len(points)} chunks to Qdrant Cloud.")
 
 
 if __name__ == "__main__":
@@ -106,15 +98,13 @@ if __name__ == "__main__":
             file_groups[source] = []
         file_groups[source].append(chunk)
 
-
-    chroma_client = PersistentClient(path=DB_NAME)
+    qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL"), api_key=os.getenv("QDRANT_API_KEY"))
 
     print(f"Found {len(file_groups)} distinct documents to process.\n")
 
-
     for source_file, chunks in file_groups.items():
         print(f"Processing: {Path(source_file).name}")
-        create_embeddings_for_file(chroma_client, chunks)
+        create_embeddings_for_file(qdrant_client, chunks)
         print("-" * 40)
 
-    print("\nIngestion complete! Your vector database is ready.")
+    print("\nIngestion complete! Data is now on Qdrant Cloud.")
