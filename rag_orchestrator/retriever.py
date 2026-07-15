@@ -1,12 +1,16 @@
 import re
 from openai import OpenAI
 from chromadb import PersistentClient
-from rag_orchestrator.config import JINA_API_KEY, JINA_EMBEDDING_MODEL, DB_PATH, RETRIEVAL_K
+from qdrant_client import QdrantClient
+from rag_orchestrator.config import JINA_API_KEY, JINA_EMBEDDING_MODEL, QDRANT_URL, QDRANT_API_KEY, RETRIEVAL_K
 from rag_orchestrator.schema import RetrievedChunk, RewrittenQuery
 
 
 jina_client = OpenAI(api_key=JINA_API_KEY, base_url="https://api.jina.ai/v1")
-chroma_client = PersistentClient(path=DB_PATH)
+print("URL:", repr(QDRANT_URL))
+print("API KEY:", repr(QDRANT_API_KEY[:10]))
+qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+print(qdrant_client.get_collections())
 
 
 def _sanitize_collection_name(ticker: str, year: int) -> str:
@@ -26,28 +30,33 @@ def _fetch_single_query(query: str, collection_name: str) -> list[RetrievedChunk
 
     """Here the response is the object returned by the embedding model"""
     response = jina_client.embeddings.create(model=JINA_EMBEDDING_MODEL, input=[query])
-    query_embedding = response.data[0].embedding
+    query_vector = response.data[0].embedding
 
+    search_results = qdrant_client.query_points(
+        collection_name=collection_name,
+        query=query_vector,
+        limit=RETRIEVAL_K
+    ).points
 
-    collection = chroma_client.get_collection(collection_name)
-    results = collection.query(query_embeddings=[query_embedding], n_results=RETRIEVAL_K)
 
 
     chunks = []
-    if results["documents"] and results["documents"][0]:
-        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-            try:
-                chunk = RetrievedChunk(
-                    text=doc,
-                    headline=meta.get("headline", "No Headline"),
-                    summary=meta.get("summary", "No Summary"),
-                    source=meta.get("source", "Unknown"),
-                    broad_topic=meta.get("broad_topic", "Unknown")
-                )
-                chunks.append(chunk)
-            except Exception as e:
-                print(f"Failed to parse a chunk: {e}")
-                continue
+    for result in search_results:
+        payload = result.payload
+        try:
+            chunk = RetrievedChunk(
+                text=payload.get("text", ""),
+                headline=payload.get("headline", "No Headline"),
+                summary=payload.get("summary", "No Summary"),
+                source=payload.get("source", "Unknown"),
+                broad_topic=payload.get("broad_topic", "Unknown")
+            )
+            chunks.append(chunk)
+        except Exception as e:
+            print(f"Failed to parse a chunk: {e}")
+            continue
+
+
 
     return chunks
 
@@ -67,7 +76,7 @@ def retrieve_chunks(
     collection_name = _sanitize_collection_name(ticker, year)
 
 
-    existing = [c.name for c in chroma_client.list_collections()]
+    existing = [c.name for c in qdrant_client.get_collections().collections]
     if collection_name not in existing:
         raise ValueError(f"Collection '{collection_name}' not found")
 
