@@ -1,6 +1,6 @@
 import re
 from openai import OpenAI
-from chromadb import PersistentClient
+from tenacity import retry, stop_after_attempt, wait_exponential
 from qdrant_client import QdrantClient
 from rag_orchestrator.config import JINA_API_KEY, JINA_EMBEDDING_MODEL, QDRANT_URL, QDRANT_API_KEY, RETRIEVAL_K
 from rag_orchestrator.schema import RetrievedChunk, RewrittenQuery
@@ -9,7 +9,8 @@ from rag_orchestrator.schema import RetrievedChunk, RewrittenQuery
 jina_client = OpenAI(api_key=JINA_API_KEY, base_url="https://api.jina.ai/v1")
 print("URL:", repr(QDRANT_URL))
 print("API KEY:", repr(QDRANT_API_KEY[:10]))
-qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+
+qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY,timeout=120)
 print(qdrant_client.get_collections())
 
 
@@ -23,7 +24,11 @@ def _sanitize_collection_name(ticker: str, year: int) -> str:
         name = "doc_" + name
     return name.lower()
 
-
+@retry(
+    wait=wait_exponential(multiplier=1,min=2,max=30),
+    stop=stop_after_attempt(5),
+    reraise=True
+)
 def _fetch_single_query(query: str, collection_name: str) -> list[RetrievedChunk]:
 
     """Embeds a single query and fetches chunks from ChromaDB."""
