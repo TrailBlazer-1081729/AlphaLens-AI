@@ -23,12 +23,10 @@ def download_10k(ticker: str, year: int):
     md_path.write_text(markdown, encoding="utf-8")
 
 
-    html = filing.html()
-    html_path = folder / f"{ticker}_{year}_10K.html"
-    html_path.write_text(html, encoding="utf-8")
+
 
     print(f"Saved Markdown: {md_path}")
-    print(f"Saved HTML: {html_path}")
+
 
 
 download_10k("GS", 2023)
