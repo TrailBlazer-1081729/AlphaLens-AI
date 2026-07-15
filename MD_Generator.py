@@ -17,7 +17,7 @@ def download_10k(ticker: str, year: int):
     folder = Path(__file__).parent / "Knowledge-base" / "finance_reports"
     folder.mkdir(parents=True, exist_ok=True)
 
-    
+
     markdown = filing.markdown()
     md_path = folder / f"{ticker}_{year}_10K.md"
     md_path.write_text(markdown, encoding="utf-8")
@@ -31,4 +31,4 @@ def download_10k(ticker: str, year: int):
     print(f"Saved HTML: {html_path}")
 
 
-download_10k("MSFT", 2025)
+download_10k("GS", 2023)
