@@ -6,16 +6,14 @@ from rag_orchestrator.config import QDRANT_URL, QDRANT_API_KEY
 from ticker_extractor import get_ticker
 from MD_Generator import download_10k
 
-
 KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_reports"
 
 
 def build_knowledge_base(company_name: str, year: int):
     """Generator function that yields status updates to Gradio while building the KB."""
 
-
     from qdrant_client import QdrantClient
-    from ingest.stage_2_worker import  process_single_part
+    from ingest.stage_2_worker import process_single_part
     from ingest.stage_3_embed import create_embeddings_for_file
 
     yield "🔍 Step 1/5: Extracting stock ticker symbol..."
@@ -27,8 +25,6 @@ def build_knowledge_base(company_name: str, year: int):
     yield f"✅ Identified Ticker: {ticker}"
 
     yield "🔍 Step 2/5: Checking cloud database..."
-
-
 
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=120)
     collection_name = f"{ticker.lower()}_{year}_10k"
@@ -82,7 +78,6 @@ def build_knowledge_base(company_name: str, year: int):
         print(f"Stage 1 Complete - Found {len(sections)} Sections")
         print("=" * 100)
 
-        # FIX: Use the correct dictionary keys from parse_10k_items
         for section in sections:
             print(
                 f"{section.get('part_number', 0):02d}. "
@@ -99,7 +94,6 @@ def build_knowledge_base(company_name: str, year: int):
         total_sections = len(sections)
 
         for i, section in enumerate(sections, start=1):
-            # FIX: Yield progress updates inside the loop so Gradio doesn't look stuck!
             topic_name = section.get("topic", "Unknown Topic")
             yield f"🧠 Step 4/5: Generating headlines... (Section {i}/{total_sections}: {topic_name})"
 
@@ -125,19 +119,17 @@ def build_knowledge_base(company_name: str, year: int):
         yield f"❌ Error processing document: {e}"
         return
 
-
-
-
     yield "☁️ Step 5/5: Embedding and uploading to Qdrant Cloud (this may take a minute)..."
 
     max_retries = 5
+    upload_success = False  # FIX: Added a flag to track success
+
     for attempt in range(max_retries):
         try:
-
             upload_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=120)
             create_embeddings_for_file(upload_client, all_final_chunks, collection_name)
+            upload_success = True  # FIX: Mark as successful
             break
-
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2 ** attempt
@@ -145,9 +137,12 @@ def build_knowledge_base(company_name: str, year: int):
                 import time
                 time.sleep(wait_time)
             else:
-
                 yield f"❌ Error uploading to cloud after {max_retries} attempts: {e}"
                 return
+
+    # FIX: Yield the final success message if upload worked
+    if upload_success:
+        yield f"🎉 Success! Knowledge base for {company_name} ({year}) built and saved to cloud.\n\n✅ You can now scroll down and ask questions in the chat!"
 
 
 if __name__ == "__main__":
