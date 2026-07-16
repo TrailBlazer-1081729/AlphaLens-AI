@@ -1,3 +1,4 @@
+print("0")
 import gradio as gr
 print("1")
 from pathlib import Path
