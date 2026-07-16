@@ -1,8 +1,13 @@
 import gradio as gr
+print("1")
 from pathlib import Path
+print("2")
 from master_pipeline import build_knowledge_base
+print("3")
 from rag_orchestrator.pipeline import run_rag_pipeline
+print("4")
 from ticker_extractor import get_ticker
+print("5")
 
 KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_reports"
 
@@ -175,4 +180,4 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(inbrowser=True, theme=theme)
+    demo.launch(theme=theme)
