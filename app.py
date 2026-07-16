@@ -1,14 +1,8 @@
-print("0")
+import os
 import gradio as gr
-print("1")
 from pathlib import Path
-print("2")
-from master_pipeline import build_knowledge_base
-print("3")
-from rag_orchestrator.pipeline import run_rag_pipeline
-print("4")
-from ticker_extractor import get_ticker
-print("5")
+
+print("0 - Starting lightweight imports")
 
 KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_reports"
 
@@ -19,12 +13,17 @@ KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_report
 def run_ingestion(company_name, year, log_box):
     """Runs the pipeline generator and accumulates logs for the UI."""
 
+    print("Loading heavy ingestion libraries...")
+    from master_pipeline import build_knowledge_base
+    from ticker_extractor import get_ticker
+
     current_log = log_box if log_box else ""
 
     ticker = get_ticker(company_name)
     if ticker == "UNKNOWN":
         ticker = company_name.strip().upper().replace(" ", "_")
     expected_md_path = KNOWLEDGE_BASE_PATH / f"{ticker}_{int(year)}_10k.md"
+
     for status in build_knowledge_base(company_name, int(year)):
         current_log += status + "\n"
         if expected_md_path.exists():
@@ -66,6 +65,11 @@ def put_message_in_chatbot(message, history):
 
 def chat(history, company_name, year):
     """Processes the RAG pipeline and appends the assistant's response."""
+    # LAZY IMPORT: Only load heavy RAG libraries when the user asks a question
+    print("Loading heavy chat libraries...")
+    from rag_orchestrator.pipeline import run_rag_pipeline
+    from ticker_extractor import get_ticker
+
     last_message = history[-1]["content"]
     if isinstance(last_message, list):
         last_message = last_message[0]["text"]
@@ -99,12 +103,11 @@ def chat(history, company_name, year):
 # -----------------------------------------
 theme = gr.themes.Soft(font=["Inter", "system-ui", "sans-serif"])
 
+print("1 - Building Gradio UI...")
+
 with gr.Blocks(title="AlphaLens Finance RAG") as demo:
     gr.Markdown("# 🏢 AlphaLens: 10-K RAG System\nAsk me anything about corporate 10-K annual reports!")
 
-    # ==========================================
-    # MIDDLE SECTION: Ingestion Pipeline
-    # ==========================================
     with gr.Row():
         company_input = gr.Textbox(
             label="Company Name",
@@ -145,16 +148,11 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
 
     gr.Markdown("---")
 
-    # ==========================================
-    # BOTTOM SECTION: RAG Chat + Sources
-    # ==========================================
     with gr.Row():
-        # LEFT COLUMN: Chat Interface (Scale 1)
         with gr.Column(scale=1):
             chatbot = gr.Chatbot(
                 label="💬 Conversation",
                 height=600,
-
             )
             chat_input = gr.Textbox(
                 label="Your Question",
@@ -180,5 +178,16 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
         outputs=[chatbot, sources_output]
     )
 
+print("2 - UI Built Successfully!")
+
 if __name__ == "__main__":
-    demo.launch(theme=theme)
+
+    port = int(os.environ.get("PORT", 7860))
+
+    print(f"3 - Launching Gradio on port {port}...")
+    demo.launch(
+        server_name="0.0.0.0",  # Crucial for cloud deployment
+        server_port=port,  # Crucial for Render
+        theme=theme,
+        inbrowser=False  # Prevents crashes on headless servers
+    )
