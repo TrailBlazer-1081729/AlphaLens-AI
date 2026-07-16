@@ -26,15 +26,14 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
     for i, line in enumerate(lines):
         clean_line = line.strip()
 
-        # FIX: Handle headers formatted as markdown table rows (e.g., "| Item 1. | | Business |")
-        # but still skip Table of Contents rows.
+
         if '|' in clean_line:
             if 'Item' in clean_line:
-                # Strip the pipes and collapse spaces so it becomes "Item 1. Business"
+
                 clean_line = clean_line.replace('|', ' ')
                 clean_line = re.sub(r'\s+', ' ', clean_line).strip()
             else:
-                # It's a regular data table (not an Item header), skip it
+
                 continue
 
         if re.search(r'\.{2,}', clean_line):
@@ -48,10 +47,10 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
         if match:
             item_id = match.group(1).upper()
 
-            # FIX: If the title is on the same line, grab it. Otherwise, peek ahead past blank lines.
+
             title = match.group(2)
             if not title:
-                # Look ahead a few lines to find the title, skipping empty lines
+
                 for j in range(i + 1, min(i + 5, len(lines))):
                     peek_line = lines[j].strip()
                     if peek_line:  # Found a non-empty line
@@ -62,7 +61,7 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
                             title = clean_peek
                         break  # Stop looking once we find a non-empty line
 
-            # Fallback if we still couldn't find a title
+
             if not title:
                 title = "Unknown"
 
