@@ -19,7 +19,7 @@ Stop settling for generic, hallucination-prone RAG pipelines. AlphaLens is a mul
 
 ---
 
-![AlphaLens Dashboard](docs/screenshots/Screenshot 2026-07-16 155359.png)
+![AlphaLens Dashboard](docs/screenshots/hero.png)
 
 ---
 
@@ -27,7 +27,7 @@ Stop settling for generic, hallucination-prone RAG pipelines. AlphaLens is a mul
 
 | Knowledge Base Creation | Financial Q&A |
 | :---------------------: | :-----------: |
-| ![](docs/screenshots/Screenshot 2026-07-16 152201.png) | ![](docs/screenshots/Screenshot 2026-07-16 152908.png) |
+| ![](docs/screenshots/ingestion.png) | ![](docs/screenshots/chat.png) |
 | *Download, parse, chunk, embed, and build the vector database with live pipeline logs.* | *Ask financial questions and inspect the supporting source chunks used to generate every answer.* |
 
 ---
