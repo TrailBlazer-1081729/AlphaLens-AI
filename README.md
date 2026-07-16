@@ -1,4 +1,3 @@
-```markdown
 # 🏢 AlphaLens
 
 ### Financial Retrieval-Augmented Generation for SEC 10-K Filings
@@ -270,11 +269,4 @@ AlphaLens/
 ## 📄 License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-```
 
-Four changes applied:
-
-1. **Why AlphaLens?** — replaced the arrow flow with the paragraph-based prose.
-2. **Example Workflow** — replaced plain text arrows with the box-drawing diagram.
-3. **Feature names** — "Zero-Hallucination Chunking" → "Verbatim Semantic Chunking", "This pipeline doesn't crash" → "Production-grade Resiliency".
-4. **At a Glance** — added the five-bullet section right after the screenshot block.
