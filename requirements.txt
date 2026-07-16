@@ -1,0 +1,9 @@
+gradio
+python-dotenv
+pydantic
+litellm
+tqdm
+tenacity
+qdrant-client
+openai
+edgartools
