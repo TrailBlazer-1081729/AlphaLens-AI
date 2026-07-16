@@ -2,6 +2,7 @@
 <div align="center">
   
 # 🏢 AlphaLens: Next-Gen Financial RAG
+
 **Stop settling for generic, hallucination-prone RAG pipelines.** 
 *AlphaLens is a production-grade, multi-stage Retrieval-Augmented Generation engine built specifically for SEC 10-K annual reports.*
 
@@ -21,6 +22,7 @@
 Most RAG tutorials treat a 10-K like a generic PDF—blindly slicing it into 500-token chunks, destroying tables, splitting paragraphs mid-sentence, and hoping the LLM figures it out. **That doesn't work for finance.**
 
 AlphaLens introduces a **Deterministic Semantic Chunking** & **Advanced 6-Step Retrieval** architecture:
+
 1. 🧠 **Domain-Aware Parsing:** It doesn't split by word count; it maps the document by SEC Items (Item 1, 1A, 7, etc.) to keep related financial context together.
 2. 🔒 **Zero-Hallucination Chunking:** We use an LLM to identify semantic boundaries, but **strictly enforce 100% verbatim text preservation**. No dropped tables, no paraphrased risk factors.
 3. 🏷️ **Auto-Enriched Metadata:** Every chunk is automatically given a specific `headline` and `summary` by the LLM, which are embedded alongside the text for superior vector search.
@@ -30,8 +32,6 @@ AlphaLens introduces a **Deterministic Semantic Chunking** & **Advanced 6-Step R
 ---
 
 ### 📸 Screenshots
-
-*(Upload your screenshots to the repo and update the links below)*
 
 | The Ingestion Pipeline (Real-time Logs) | The RAG Chat Interface (Chat + Sources) |
 | :---: | :---: |
