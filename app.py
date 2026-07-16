@@ -13,11 +13,15 @@ KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_report
 def run_ingestion(company_name, year, log_box):
     """Runs the pipeline generator and accumulates logs for the UI."""
 
-    print("Loading heavy ingestion libraries...")
+    # Start with a fresh log instead of appending to the old one
+    current_log = ""
+
+    # Prepare to clear the chat and sources when a new build starts
+    clear_chat = []
+    clear_sources = "*Sources will appear here after you ask a question.*"
+
     from master_pipeline import build_knowledge_base
     from ticker_extractor import get_ticker
-
-    current_log = log_box if log_box else ""
 
     ticker = get_ticker(company_name)
     if ticker == "UNKNOWN":
@@ -30,7 +34,9 @@ def run_ingestion(company_name, year, log_box):
             downloadable_file = str(expected_md_path)
         else:
             downloadable_file = None
-        yield current_log, downloadable_file
+
+        # Yield 4 things so Gradio updates the log, download, chat, and sources
+        yield current_log, downloadable_file, clear_chat, clear_sources
 
 
 # -----------------------------------------
@@ -65,7 +71,7 @@ def put_message_in_chatbot(message, history):
 
 def chat(history, company_name, year):
     """Processes the RAG pipeline and appends the assistant's response."""
-    # LAZY IMPORT: Only load heavy RAG libraries when the user asks a question
+
     print("Loading heavy chat libraries...")
     from rag_orchestrator.pipeline import run_rag_pipeline
     from ticker_extractor import get_ticker
@@ -140,12 +146,6 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
         autoscroll=True,
     )
 
-    build_btn.click(
-        fn=run_ingestion,
-        inputs=[company_input, year_input, log_output],
-        outputs=[log_output, md_download]
-    )
-
     gr.Markdown("---")
 
     with gr.Row():
@@ -168,6 +168,16 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
                 height=600,
             )
 
+    # =====================================================================
+    # EVENT LISTENERS MUST BE AT THE BOTTOM AFTER ALL UI COMPONENTS EXIST
+    # =====================================================================
+
+    build_btn.click(
+        fn=run_ingestion,
+        inputs=[company_input, year_input, log_output],
+        outputs=[log_output, md_download, chatbot, sources_output]
+    )
+
     chat_input.submit(
         put_message_in_chatbot,
         inputs=[chat_input, chatbot],
@@ -181,13 +191,12 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
 print("2 - UI Built Successfully!")
 
 if __name__ == "__main__":
-
     port = int(os.environ.get("PORT", 7860))
 
     print(f"3 - Launching Gradio on port {port}...")
     demo.launch(
-        server_name="0.0.0.0",  # Crucial for cloud deployment
-        server_port=port,  # Crucial for Render
+        server_name="0.0.0.0",
+        server_port=port,
         theme=theme,
-        inbrowser=False  # Prevents crashes on headless servers
+        inbrowser=False
     )

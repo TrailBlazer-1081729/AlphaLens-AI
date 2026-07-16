@@ -19,7 +19,6 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
         "10", "11", "12", "13", "14", "15"
     ]
 
-    # FIX: Made the title part (?:\s+(.+))? optional so it catches "Item 1." on a line by itself
     item_regex = re.compile(r'^#{0,6}\s*Item\s*(\d+[A-C]?)\.?(?:\s+(.+))?', re.IGNORECASE)
 
     potential_items = []
@@ -27,12 +26,21 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
     for i, line in enumerate(lines):
         clean_line = line.strip()
 
+        # FIX: Handle headers formatted as markdown table rows (e.g., "| Item 1. | | Business |")
+        # but still skip Table of Contents rows.
         if '|' in clean_line:
-            continue
+            if 'Item' in clean_line:
+                # Strip the pipes and collapse spaces so it becomes "Item 1. Business"
+                clean_line = clean_line.replace('|', ' ')
+                clean_line = re.sub(r'\s+', ' ', clean_line).strip()
+            else:
+                # It's a regular data table (not an Item header), skip it
+                continue
 
         if re.search(r'\.{2,}', clean_line):
             continue
 
+        # This skips TOC rows that end in page numbers (e.g., "Item 1. Business 12")
         if re.search(r'\s\d{1,3}\s*$', clean_line):
             continue
 
@@ -40,36 +48,32 @@ def parse_10k_items(markdown_text: str, source: str = "SEC 10-K") -> List[Dict[s
         if match:
             item_id = match.group(1).upper()
 
-            match = item_regex.match(clean_line)
-            if match:
-                item_id = match.group(1).upper()
+            # FIX: If the title is on the same line, grab it. Otherwise, peek ahead past blank lines.
+            title = match.group(2)
+            if not title:
+                # Look ahead a few lines to find the title, skipping empty lines
+                for j in range(i + 1, min(i + 5, len(lines))):
+                    peek_line = lines[j].strip()
+                    if peek_line:  # Found a non-empty line
+                        # Strip markdown hashes to get the raw title text
+                        clean_peek = peek_line.lstrip('#').strip()
+                        # Make sure this line isn't another Item header
+                        if clean_peek and not item_regex.match(peek_line):
+                            title = clean_peek
+                        break  # Stop looking once we find a non-empty line
 
-                # FIX: If the title is on the same line, grab it. Otherwise, peek ahead past blank lines.
-                title = match.group(2)
-                if not title:
-                    # Look ahead a few lines to find the title, skipping empty lines
-                    for j in range(i + 1, min(i + 5, len(lines))):
-                        peek_line = lines[j].strip()
-                        if peek_line:  # Found a non-empty line
-                            # Strip markdown hashes to get the raw title text
-                            clean_peek = peek_line.lstrip('#').strip()
-                            # Make sure this line isn't another Item header
-                            if clean_peek and not item_regex.match(peek_line):
-                                title = clean_peek
-                            break  # Stop looking once we find a non-empty line
+            # Fallback if we still couldn't find a title
+            if not title:
+                title = "Unknown"
 
-                # Fallback if we still couldn't find a title
-                if not title:
-                    title = "Unknown"
+            title = title.strip().rstrip('.')
 
-                title = title.strip().rstrip('.')
-
-                if item_id in item_sequence:
-                    potential_items.append({
-                        "item_id": item_id,
-                        "title": title,
-                        "line_num": i
-                    })
+            if item_id in item_sequence:
+                potential_items.append({
+                    "item_id": item_id,
+                    "title": title,
+                    "line_num": i
+                })
 
     valid_items = []
     last_idx = -1
@@ -164,8 +168,6 @@ def merge_small_parts(
 
         part_words = len(part["text"].split())
 
-        # Don't merge if current part is already large enough
-        # or if merging would exceed the maximum size.
         if (
                 current_words >= target_words
                 or current_words + part_words > max_words
@@ -176,20 +178,16 @@ def merge_small_parts(
             current_words = part_words
             continue
 
-        # Merge text
         current["text"] += "\n\n" + part["text"]
 
-        # Merge topic names
         current["topic"] += " | " + part["topic"]
 
-        # Store merged metadata
         current["metadata"]["item"] += ", " + part["metadata"]["item"]
 
         current_words += part_words
 
     merged_parts.append(current)
 
-    # Renumber parts
     for i, part in enumerate(merged_parts, start=1):
         part["part_number"] = i
 
@@ -200,7 +198,7 @@ if __name__ == "__main__":
 
     from pathlib import Path
 
-    test_file = Path(__file__).parent.parent / "knowledge-base/finance_reports/GOOGL_2024_10K.md"
+    test_file = Path(__file__).parent.parent / "knowledge-base/finance_reports/CSCO_2024_10k.md"
 
     if not test_file.exists():
         print(f"❌ File not found: {test_file.resolve()}")
