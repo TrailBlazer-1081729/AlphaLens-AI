@@ -10,15 +10,22 @@ KNOWLEDGE_BASE_PATH = Path(__file__).parent / "Knowledge-base" / "finance_report
 # -----------------------------------------
 # 1. INGESTION LOGIC
 # -----------------------------------------
+# -----------------------------------------
+# 1. INGESTION LOGIC
+# -----------------------------------------
 def run_ingestion(company_name, year, log_box):
     """Runs the pipeline generator and accumulates logs for the UI."""
-
-    # Start with a fresh log instead of appending to the old one
     current_log = ""
-
-    # Prepare to clear the chat and sources when a new build starts
     clear_chat = []
     clear_sources = "*Sources will appear here after you ask a question.*"
+
+    # 1. Yield immediate status and FORCE CLEAR the download button component.
+    # By yielding a full gr.DownloadButton object with value=None, we destroy the old cached file.
+    current_log = "⏳ Initializing pipeline modules (this might take a few seconds)...\n"
+    yield current_log, gr.DownloadButton(value=None, label="📥 Download MD"), clear_chat, clear_sources
+
+    import time
+    time.sleep(0.5)
 
     from master_pipeline import build_knowledge_base
     from ticker_extractor import get_ticker
@@ -28,16 +35,18 @@ def run_ingestion(company_name, year, log_box):
         ticker = company_name.strip().upper().replace(" ", "_")
     expected_md_path = KNOWLEDGE_BASE_PATH / f"{ticker}_{int(year)}_10k.md"
 
+    # 2. Run the pipeline
     for status in build_knowledge_base(company_name, int(year)):
         current_log += status + "\n"
+
+        # If the file exists on disk, yield a NEW DownloadButton object with the file path.
+        # This forces Gradio to register the new file and bypass the cache.
         if expected_md_path.exists():
-            downloadable_file = str(expected_md_path)
+            downloadable_file = gr.DownloadButton(value=str(expected_md_path), label="📥 Download MD (Ready)")
         else:
-            downloadable_file = None
+            downloadable_file = gr.DownloadButton(value=None, label="📥 Download MD")
 
-        # Yield 4 things so Gradio updates the log, download, chat, and sources
         yield current_log, downloadable_file, clear_chat, clear_sources
-
 
 # -----------------------------------------
 # 2. CHAT + SOURCES LOGIC
@@ -128,11 +137,11 @@ with gr.Blocks(title="AlphaLens Finance RAG") as demo:
             precision=0,
             scale=1
         )
-        md_download = gr.File(
+
+        md_download = gr.DownloadButton(
             label="📥 Download MD",
             scale=1,
-            interactive=False,
-            visible=True
+            variant="secondary"
         )
 
     with gr.Row():
@@ -195,8 +204,7 @@ if __name__ == "__main__":
 
     print(f"3 - Launching Gradio on port {port}...")
     demo.launch(
-        server_name="0.0.0.0",
-        server_port=port,
+
         theme=theme,
         inbrowser=False
     )
