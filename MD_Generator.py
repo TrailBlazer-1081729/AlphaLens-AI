@@ -29,4 +29,4 @@ def download_10k(ticker: str, year: int):
 
 
 
-download_10k("GS", 2023)
+    # download_10k("amzn", 2024)
